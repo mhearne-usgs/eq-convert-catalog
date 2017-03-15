@@ -24,5 +24,8 @@ def get_events(filename,contributor=None,catalog=None):
                             'lon':row['lon'],
                             'depth':{'value':row['depth'],'uncertainty':row['depth_uncertainty']}}]
         event['magnitudes'] = [{'preferred':True,'type':'Mw','value':row['mw'],'author':row['moment_author'].strip()}]
+        #because the time may be buried in a sub-dictionary, making a timestamp field at the top 
+        #level that we can sort on later.
+        event['timestamp'] = event['origins'][0]['time']
         events.append(event.copy())
-    return events
+    return sorted(events,key=lambda k:k['timestamp'])

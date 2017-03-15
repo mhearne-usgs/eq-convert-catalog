@@ -81,6 +81,10 @@ def getAllMonths(lastreviewed):
 
     return (ndkfiles,endofmonth)
 
+def sort_by_month_key(monthstr):
+    _MONTH_MAP = {m.lower()[0:3]: i for i, m in enumerate(calendar.month_name[1:])}
+    return _MONTH_MAP[monthstr[0:3]]
+
 def getYearMonths(year,lastreviewed):
     months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
     ndkfiles = []
@@ -91,8 +95,12 @@ def getYearMonths(year,lastreviewed):
     endofmonth = datetime.datetime(1990,1,1)
     pat = '[a-z]{3}[0-9]{2}\.ndk'
     matches = re.findall(pat,data)
-    matches = list(set(matches)) #unique values
+    tmatches = list(set(matches)) #unique values
+    
+    #sort the list of matches by month... how?
+    matches = sorted(tmatches,key=sort_by_month_key)
     eventmonths = []
+    tdir = tempfile.mkdtemp()
     for match in matches:
         eyear = int(match[3:5]) + 2000
         emonth = months.index(match[0:3]) + 1
@@ -103,7 +111,7 @@ def getYearMonths(year,lastreviewed):
             endofmonth = monthend
         if monthstart > lastreviewed:
             ndkurl = urllib.parse.urljoin(yearurl,match)
-            ndkfiles.append(getMonthlyNDK(ndkurl))
+            ndkfiles.append(getMonthlyNDK(ndkurl,tdir))
     return (ndkfiles,endofmonth)
     
 def getRecentMonths(lastreviewed):
@@ -121,9 +129,9 @@ def getRecentMonths(lastreviewed):
         raise Exception('Could not retrieve data from %s.  Message: "%s"' % (MONTHLYURL,message.message))
     return (ndkfiles,endofmonth)
 
-def getMonthlyNDK(ndkurl):
-    f,ndkfilename = tempfile.mkstemp(suffix='.ndk')
-    os.close(f)
+def getMonthlyNDK(ndkurl,tdir):
+    fname = ndkurl.split('/')[-1]
+    ndkfilename = os.path.join(tdir,fname)
     fh = request.urlopen(ndkurl)
     data = fh.read().decode('utf-8')
     fh.close()
@@ -200,10 +208,15 @@ def main(args):
         sys.exit(0)
 
     nreviewed = 0
+    nrevskipped = 0
     for mndkfile in mndkfiles:
-        for event in ndk.get_events(mndkfile):
+        mevents = ndk.get_events(mndkfile)
+        print('%i events in %s' % (len(mevents),mndkfile))
+        for i in range(0,len(mevents)):
+            event = mevents[i]
             #any reviewed events that are older than the most recent reviewed events should not be processed
-            if event['origins'][0]['time'] <= processdict['lastreviewed']:
+            if event['origins'][0]['time'] < processdict['lastreviewed']:
+                nrevskipped += 1
                 continue
             sys.stderr.write('Writing QuakeML for reviewed event %s %s\n' % (event['id'],event['origins'][0]['time']))
             quakeml = create_quakeml(event)
@@ -221,6 +234,7 @@ def main(args):
     #tell the user what just happened
     print('%i quick events parsed.' % nquick)
     print('%i reviewed events parsed.' % nreviewed)
+    print('%i reviewed events skipped.' % nrevskipped)
         
     #clean up after ourselves
     for mndkfile in mndkfiles:

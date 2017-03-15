@@ -106,7 +106,8 @@ def get_events(filename,contributor=None,catalog=None):
                      'contributor':contributor}
 
     fh.close()
-    return events
+    new_events = sorted(events,key=lambda k: k['timestamp'])
+    return new_events
 
 def _parseLine1(line,tdict):
     origins = []
@@ -137,12 +138,23 @@ def _parseLine1(line,tdict):
     origin['depth'] = edepth
     origins.append(origin)
     tdict['origins'] = origins
+    #because the time may be buried in a sub-dictionary, making a timestamp field at the top 
+    #level that we can sort on later.
+    tdict['timestamp'] = etime
     #let's not concern ourselves with triggering magnitude, since we're more interested in derived mag and
     #we may not know what they are anyway.
     return tdict
 
 def _parseLine2(line,tdict):
-    tdict['id'] = line[0:16].strip()
+    tdict['id'] = line[1:16].strip()
+
+    # it appears that if GCMT has more that 26 events recorded in one day, 
+    # they switch to lower case in their naming convention.
+    # if we see a lower case letter at the end, we'll just double it,
+    # turning C200501010120a into C200501010120aa
+    if tdict['id'][-1].islower():
+        tdict['id'] += tdict['id'][-1]
+    
     body = {'numstations':int(line[19:22].strip()),
             'numchannels':int(line[22:27].strip())}
     surface = {'numstations':int(line[34:37].strip()),

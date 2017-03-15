@@ -193,6 +193,9 @@ def readHypoLine(event,line):
     else:
         origin['preferred'] = True
         event['origins'] = [origin]
+    #because the time may be buried in a sub-dictionary, making a timestamp field at the top 
+    #level that we can sort on later.
+    event['timestamp'] = origin['time']['value']
     return event
 
 def readMagnitudeLine(event,line):
@@ -375,7 +378,7 @@ def get_events(qomfile,contributor='us',catalog='us'):
                                             'value':prefmag,
                                             'author':prefsource})
 
-    return events
+    return sorted(events,key=lambda k:k['timestamp'])
 
 
     
